@@ -3,476 +3,139 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>對稱解碼迷宮 — 線對稱挑戰</title>
+<title>紅旗老師的 AI 教學天地</title>
 <style>
   :root{
-    --bg:#070b16; --panel:#121b35; --accent:#7cff6b; --accent2:#58b4ff;
-    --ok:#38d39f; --bad:#ff4d6d; --text:#eaf2ff; --muted:#9ab0d9;
+    --bg1:#fff4f0; --bg2:#f0f7ff; --ink:#3a2f45; --muted:#7a6f8a;
+    --pink:#ff8fab; --mint:#7fd9c5; --sky:#7cc6ff; --sun:#ffd166;
+    --card:#ffffffcc; --shadow:0 12px 32px rgba(90,70,140,.15);
   }
   *{box-sizing:border-box}
   body{
-    margin:0; font-family:"Segoe UI","Microsoft JhengHei",sans-serif;
-    background:radial-gradient(900px 700px at 40% -10%,#17285a,var(--bg) 72%);
-    color:var(--text); min-height:100vh;
+    margin:0; font-family:"Microsoft JhengHei","Segoe UI",sans-serif;
+    color:var(--ink); min-height:100vh;
+    background:
+      radial-gradient(900px 500px at 15% -10%, #ffd6ec, transparent 60%),
+      radial-gradient(900px 500px at 85% 0%, #d6eaff, transparent 60%),
+      linear-gradient(180deg,var(--bg1),var(--bg2));
+    overflow-x:hidden;
   }
-  .wrap{max-width:980px;margin:0 auto;padding:16px}
-  header h1{margin:0;font-size:24px}
-  header .sub{color:var(--muted);font-size:13px}
-  .hud{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
-  .card{background:linear-gradient(180deg,#1a2750,#0d1630);border:1px solid #2a3c6e;border-radius:12px;padding:8px 10px;font-size:13px}
-  .card b{display:block;font-size:16px;color:var(--accent2)}
-  .stage{display:grid;grid-template-columns:260px 1fr 280px;gap:12px}
-  .panel{background:linear-gradient(180deg,#1a2750,#0d1630);border:1px solid #2a3c6e;border-radius:12px;padding:12px}
-  .panel h3{margin:0 0 8px 0;font-size:15px;color:var(--accent2)}
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 18px 40px}
+  .hero{
+    text-align:center; padding:28px 20px; border-radius:28px;
+    background:linear-gradient(135deg,#ffffffcc,#fff6fbcc);
+    box-shadow:var(--shadow); position:relative; overflow:hidden;
+  }
+  .hero::before,.hero::after{
+    content:""; position:absolute; border-radius:50%; opacity:.35; pointer-events:none;
+  }
+  .hero::before{width:180px;height:180px;background:#ffd166; top:-60px; left:-40px}
+  .hero::after{width:140px;height:140px;background:#7cc6ff; bottom:-50px; right:-30px}
+  .flag{font-size:64px; display:inline-block; animation:wave 2.2s ease-in-out infinite; transform-origin:bottom center}
+  @keyframes wave{0%,100%{transform:rotate(-8deg)}50%{transform:rotate(8deg)}}
+  h1{margin:6px 0 4px;font-size:34px;letter-spacing:1px}
+  .subtitle{color:var(--muted);font-size:16px;margin:0}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+  .badge{background:#fff;border:1px solid #ecd9f0;border-radius:999px;padding:6px 12px;font-size:13px;box-shadow:0 4px 10px rgba(0,0,0,.06)}
 
-  .maze{
-    display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:8px;
-    background:#050913;border:1px solid #2a3c6e;border-radius:12px;
-  }
-  .cell{
-    aspect-ratio:1; border-radius:8px; background:#0d1630; border:1px solid #2a3c6e;
-    display:flex;align-items:center;justify-content:center;font-size:18px;position:relative;
-  }
-  .cell.wall{background:#0b1020;opacity:.5}
-  .cell.path{background:#12254a}
-  .cell.done{background:linear-gradient(135deg,#1f5f3a,#0d3822);border-color:var(--accent)}
-  .cell.current{box-shadow:0 0 0 2px var(--accent2);animation:pulse 1.2s infinite}
-  .cell.exit{background:linear-gradient(135deg,#5a3f1f,#3a2810);border-color:#ffd166}
-  @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+  .section{margin-top:22px}
+  .section h2{font-size:20px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
 
-  .canvasBox{
-    position:relative;background:#0b1328;border:2px solid #2a3c6e;border-radius:14px;
-    overflow:hidden; box-shadow:0 12px 40px rgba(0,0,0,.45);
-    background-image:
-      linear-gradient(to right, rgba(120,170,255,0.12) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(120,170,255,0.12) 1px, transparent 1px);
-    background-size: 20px 20px; background-position:center;
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .game{
+    display:block;text-decoration:none;color:inherit;
+    background:var(--card); border:1px solid #eee2f5; border-radius:22px;
+    padding:18px; box-shadow:var(--shadow); transition:transform .18s, box-shadow .18s;
+    position:relative; overflow:hidden;
   }
-  canvas{display:block;width:100%;height:auto;touch-action:none;cursor:crosshair}
-  .axisLabel{position:absolute;pointer-events:none;font-size:12px;color:var(--accent2);
-    background:rgba(10,15,31,.7);padding:2px 6px;border-radius:6px;top:8px;left:50%;transform:translateX(-50%)}
-  .monster{text-align:center;font-size:56px;line-height:1;padding:6px;transition:transform .2s}
-  .monster.happy{animation:pop .5s ease}
-  .monster.angry{animation:shake .4s ease}
-  @keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.25)}100%{transform:scale(1)}}
-  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
-  .tools{display:flex;gap:8px;flex-wrap:wrap}
-  .tool{padding:8px 10px;border-radius:8px;background:#13204a;border:1px solid #2a3c6e;cursor:pointer;color:var(--text);font-size:13px}
-  .tool.active{background:var(--accent);border-color:var(--accent);color:#06200a}
-  .btn{padding:10px 14px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;
-    background:linear-gradient(135deg,#7cff6b,#4cd9b0);color:#06200a;font-size:14px}
-  .btn.secondary{background:#1f2f5a;color:var(--text);border:1px solid #2a3c6e}
-  .btn:disabled{opacity:.5;cursor:not-allowed}
-  .timerBig{font-size:38px;font-weight:900;color:var(--accent);text-align:center}
-  .hint{font-size:12px;color:var(--muted);text-align:center;margin-top:4px}
-  .roomName{font-size:14px;color:var(--accent2);text-align:center;margin-bottom:6px}
-  .overlay{position:fixed;inset:0;background:rgba(5,8,20,.78);display:none;align-items:center;justify-content:center;z-index:50;backdrop-filter:blur(4px)}
-  .overlay.show{display:flex}
-  .modal{background:#111a33;border:1px solid #2a3c6e;border-radius:16px;padding:24px;max-width:420px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.6)}
-  .modal h2{margin:0 0 8px 0;color:var(--accent2)}
-  .modal p{color:var(--muted);margin:8px 0 16px 0}
-  .confetti{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:60}
-  .confetti span{position:absolute;top:-20px;font-size:20px;animation:fall var(--d,2s) linear forwards}
-  @keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
-  @media (max-width:900px){.stage{grid-template-columns:1fr}}
+  .game:hover{transform:translateY(-6px) scale(1.02); box-shadow:0 18px 40px rgba(90,70,140,.22)}
+  .game .emoji{font-size:46px; display:block; margin-bottom:8px}
+  .game h3{margin:0 0 4px;font-size:20px}
+  .game p{margin:0;color:var(--muted);font-size:14px;line-height:1.6}
+  .tag{display:inline-block;margin-top:10px;background:linear-gradient(135deg,var(--pink),var(--sun));
+    color:#fff;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:bold}
+  .new{position:absolute;top:12px;right:12px;background:var(--mint);color:#0b3b33;
+    font-size:11px;font-weight:bold;padding:4px 8px;border-radius:999px}
+
+  .playground{background:var(--card);border:1px solid #eee2f5;border-radius:22px;padding:18px;box-shadow:var(--shadow);
+    display:grid;grid-template-columns:1fr 220px;gap:16px;align-items:center}
+  @media (max-width:640px){.playground{grid-template-columns:1fr}}
+  .qrbox{text-align:center}
+  .qrbox img{width:180px;height:180px;border-radius:14px;background:#fff;padding:8px;
+    box-shadow:0 6px 18px rgba(0,0,0,.12)}
+  .qrbox .qrhint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+
+  .coming{text-align:center;color:var(--muted);font-size:14px;padding:12px;border-radius:16px;
+    background:#ffffffaa;border:2px dashed #d9cbe8}
+
+  footer{text-align:center;color:var(--muted);font-size:13px;margin-top:26px}
+  .float{position:fixed;opacity:.18;pointer-events:none;animation:floaty 6s ease-in-out infinite}
+  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+  .f1{font-size:56px;top:12%;left:4%}
+  .f2{font-size:44px;top:24%;right:6%;animation-delay:.8s}
+  .f3{font-size:38px;bottom:8%;left:8%;animation-delay:1.5s}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="font-size:34px">🏰</div>
-      <div>
-        <h1>對稱解碼迷宮</h1>
-        <div class="sub">畫出鏡像解鎖房間、逃出地城！小五數學・線對稱 adventure</div>
-      </div>
-    </div>
-  </header>
+  <span class="float f1">⭐</span>
+  <span class="float f2">🎨</span>
+  <span class="float f3">🎈</span>
 
-  <div class="hud">
-    <div class="card">房間 <b id="room">1</b></div>
-    <div class="card">分數 <b id="score">0</b></div>
-    <div class="card">生命 <b id="lives">❤❤❤</b></div>
-    <div class="card">連擊 <b id="combo">0</b></div>
-    <div class="card">進度 <b id="progress">0%</b></div>
-  </div>
+  <div class="wrap">
+    <div class="hero">
+      <div class="flag">🚩</div>
+      <h1>紅旗老師的 AI 教學天地</h1>
+      <p class="subtitle"> playful learning · 玩遊戲、學數學、天天進步！</p>
+      <div class="badges">
+        <span class="badge">📚 國小數學</span>
+        <span class="badge">🎮 AI 互動遊戲</span>
+        <span class="badge">🌟 隨時更新新遊戲</span>
+      </div>
+    </div>
 
-  <div class="stage">
-    <div>
-      <div class="panel" style="margin-bottom:10px">
-        <h3>迷宮地圖</h3>
-        <div class="maze" id="maze"></div>
-        <div class="hint" style="margin-top:6px">綠色=已解鎖，藍色=目前房間，金色=出口</div>
+    <div class="section">
+      <h2>🎯 選擇你要挑戰的遊戲</h2>
+      <div class="grid">
+        <a class="game" href="symmetry_maze.html">
+          <span class="new">NEW</span>
+          <span class="emoji">🏰</span>
+          <h3>對稱解碼迷宮</h3>
+          <p>畫出鏡像解開房門，逃出地城！練習線對稱圖形的神級挑戰。</p>
+          <span class="tag">小五數學・線對稱</span>
+        </a>
+
+        <a class="game" href="#" onclick="return false;">
+          <span class="emoji">🚀</span>
+          <h3>更多遊戲即將推出</h3>
+          <p>紅旗老師持續新增 AI 教學遊戲，下一個驚喜正在準備中…</p>
+          <span class="tag">coming soon</span>
+        </a>
       </div>
     </div>
-    <div class="canvasBox">
-      <canvas id="guide" width="600" height="400"></canvas>
-      <canvas id="draw" width="600" height="400" style="position:absolute;inset:0"></canvas>
-      <div class="axisLabel" id="axisTag">對稱軸</div>
-    </div>
-    <div class="side">
-      <div class="panel">
-        <div class="monster" id="monster">🐉</div>
-        <div class="roomName" id="roomName">準備中</div>
-        <div class="timerBig" id="timer">—</div>
-        <div class="hint" id="hint">按「進入房間」開始</div>
-      </div>
-      <div class="panel">
-        <h3>繪圖工具</h3>
-        <div class="tools">
-          <button class="tool active" id="brushBtn">🖌 畫筆</button>
-          <button class="tool" id="eraseBtn">🧽 橡皮擦</button>
-          <button class="tool" id="clearBtn">🗑 清除</button>
+
+    <div class="section">
+      <h2>📱 上課掃描進入首頁</h2>
+      <div class="playground">
+        <div>
+          <p style="margin:0 0 8px">把這個 QR code 貼在課堂投影片或黑板，學生用平板/手機掃描，即可直接進入「紅旗老師的 AI 教學天地」。</p>
+          <ul style="margin:6px 0 0 18px;color:var(--muted);font-size:14px;line-height:1.7">
+            <li>不需安裝 App</li>
+            <li>點開就能玩</li>
+            <li>方便分組競賽</li>
+          </ul>
         </div>
-        <div style="margin-top:10px;display:flex;gap:8px">
-          <button class="btn" id="startBtn" style="flex:1">進入房間</button>
-          <button class="btn secondary" id="submitBtn" disabled>提交答案</button>
-        </div>
-      </div>
-      <div class="panel">
-        <h3>怎麼玩</h3>
-        <div style="font-size:12px;color:var(--muted);line-height:1.6">
-          <b style="color:var(--text)">1.</b> 左半是提示半邊。<br>
-          <b style="color:var(--text)">2.</b> 在右半畫鏡像解開房門。<br>
-          <b style="color:var(--text)">3.</b> 時間內完成可前進；畫錯扣血。<br>
-          <b style="color:var(--text)">4.</b> 修正建議會告訴你如何調整。
+        <div class="qrbox">
+          <img id="qr" src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https%3A%2F%2Fhpespearl2020-droid.github.io%2F115-math-U7%2F" alt="網站首頁 QR Code">
+          <div class="qrhint">掃我進入<br>紅旗老師的 AI 教學天地</div>
         </div>
       </div>
     </div>
+
+    <div class="coming">✨ 持續更新中，把這個網址收藏起來，隨時回來玩新遊戲！</div>
+
+    <footer>
+      © 紅旗老師 · AI 教學天地 · 用心設計的小學生數學遊戲
+    </footer>
   </div>
-</div>
-
-<div class="overlay" id="overlay">
-  <div class="modal">
-    <h2 id="modalTitle">—</h2>
-    <p id="modalMsg">—</p>
-    <button class="btn" id="modalBtn">繼續</button>
-  </div>
-</div>
-<div class="confetti" id="confetti"></div>
-
-<script>
-(() => {
-  const W=600,H=400;
-  const guide=document.getElementById('guide');
-  const draw=document.getElementById('draw');
-  const gctx=guide.getContext('2d');
-  const dctx=draw.getContext('2d');
-  const axisX=W/2, axisY=H/2;
-
-  const SHAPES = [
-    { name:'等腰三角形', level:'初階', pts:[{x:300,y:90},{x:430,y:230},{x:300,y:370}] },
-    { name:'梯形', level:'初階', pts:[{x:300,y:90},{x:410,y:110},{x:385,y:300},{x:300,y:320}] },
-    { name:'五邊形', level:'初階', pts:[{x:300,y:80},{x:420,y:160},{x:400,y:300},{x:340,y:340},{x:300,y:300}] },
-    { name:'圓形', level:'進階', pts: (function(){ const a=[]; for(let i=0;i<=18;i++){ const t=i/18; const ang=-Math.PI/2+t*Math.PI; a.push({x:300+120*Math.cos(ang), y:200+120*Math.sin(ang)}); } return a; })() },
-    { name:'星星', level:'進階', pts:[{x:300,y:70},{x:360,y:150},{x:450,y:160},{x:385,y:225},{x:410,y:315},{x:300,y:260}] },
-    { name:'愛心', level:'進階', pts:[{x:300,y:130},{x:365,y:90},{x:430,y:120},{x:430,y:195},{x:365,y:260},{x:300,y:330}] }
-  ];
-
-  // 迷宮路徑 5x5
-  const PATH = [[0,0],[1,0],[2,0],[2,1],[2,2],[2,3],[3,3],[4,3],[4,4]];
-  // 牆壁：非路徑普通格
-  const WALLS = new Set();
-  for(let r=0;r<5;r++) for(let c=0;c<5;c++) WALLS.add(r+','+c);
-  PATH.forEach(p=>WALLS.delete(p[0]+','+p[1]));
-
-  // state
-  let state='idle';
-  let roomIndex=0; // index of PATH position (0 start, ... final exit)
-  let level=1;
-  let score=0, combo=0, lives=3, energy=0;
-  let timerHandle=null, timeLeft=0;
-  let currentShape=null, expectedCanvas=null;
-  let axisMode='v';
-  let tool='brush';
-  let drawing=false, last=null;
-  const monList=['🐉','🦖','🐙','👽','🤖','🐯'];
-
-  // audio
-  let ac=null;
-  function audio(){ if(!ac) try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} return ac; }
-  function beep(freq,dur,type='square',vol=.12){
-    const c=audio(); if(!c) return;
-    const o=c.createOscillator(); const g=c.createGain();
-    o.type=type; o.frequency.value=freq;
-    g.gain.setValueAtTime(vol,c.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001,c.currentTime+dur);
-    o.connect(g).connect(c.destination);
-    o.start(); o.stop(c.currentTime+dur);
-  }
-  function successSnd(){ beep(523,.1); setTimeout(()=>beep(659,.1),100); setTimeout(()=>beep(784,.15),200); }
-  function failSnd(){ beep(220,.2,'sawtooth'); setTimeout(()=>beep(150,.25,'sawtooth'),150); }
-
-  function inActive(x,y){ return axisMode==='v' ? x>=axisX : y>=axisY; }
-
-  function clearDraw(){ dctx.clearRect(0,0,W,H); }
-  function setTool(t){
-    tool=t;
-    document.getElementById('brushBtn').classList.toggle('active',t==='brush');
-    document.getElementById('eraseBtn').classList.toggle('active',t==='erase');
-    draw.style.cursor=t==='erase'?'cell':'crosshair';
-  }
-  document.getElementById('brushBtn').onclick=()=>setTool('brush');
-  document.getElementById('eraseBtn').onclick=()=>setTool('erase');
-  document.getElementById('clearBtn').onclick=()=>{ clearDraw(); beep(400,.05); };
-
-  function drawShapePath(ctx,shape){
-    const pts=shape.pts, cx=W/2;
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x,pts[0].y);
-    for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x,pts[i].y);
-    for(let i=pts.length-1;i>=0;i--) ctx.lineTo(cx-(pts[i].x-cx),pts[i].y);
-    ctx.closePath();
-  }
-
-  function buildGuide(){
-    gctx.clearRect(0,0,W,H);
-    gctx.save();
-    gctx.strokeStyle='rgba(62,242,255,.6)';
-    gctx.setLineDash([6,6]);
-    gctx.lineWidth=2;
-    if(axisMode==='v'){ gctx.beginPath(); gctx.moveTo(axisX,0); gctx.lineTo(axisX,H); }
-    else { gctx.beginPath(); gctx.moveTo(0,axisY); gctx.lineTo(W,axisY); }
-    gctx.stroke();
-    gctx.setLineDash([]);
-    gctx.restore();
-
-    gctx.save();
-    if(axisMode==='v'){ gctx.beginPath(); gctx.rect(0,0,axisX,H); gctx.clip(); }
-    else { gctx.beginPath(); gctx.rect(0,0,W,axisY); gctx.clip(); }
-    drawShapePath(gctx,currentShape);
-    gctx.fillStyle='rgba(62,242,255,0.22)';
-    gctx.fill();
-    gctx.lineWidth=3;
-    gctx.strokeStyle='rgba(62,242,255,0.9)';
-    gctx.stroke();
-    gctx.restore();
-  }
-
-  function buildExpected(){
-    const c=document.createElement('canvas');
-    c.width=W; c.height=H;
-    const ctx=c.getContext('2d');
-    drawShapePath(ctx,currentShape);
-    ctx.fillStyle='#000';
-    ctx.fill();
-    expectedCanvas=c;
-  }
-
-  function getMask(canvas){
-    const ctx=canvas.getContext('2d');
-    const img=ctx.getImageData(0,0,W,H).data;
-    const expData=expectedCanvas.getContext('2d').getImageData(0,0,W,H).data;
-    let expCount=0,hit=0,extra=0,playerCount=0;
-    for(let px=0;px<W*H;px++){
-      const i=px*4; const x=px%W,y=Math.floor(px/W);
-      const inActive = axisMode==='v'? x>=axisX : y>=axisY;
-      const isExp = inActive && expData[i+3]>0;
-      const isPlayer = img[i+3]>30;
-      if(isExp){ expCount++; if(isPlayer) hit++; }
-      if(isPlayer && inActive){ playerCount++; if(!isExp) extra++; }
-    }
-    return {hit,extra,expCount,playerCount};
-  }
-
-  // drawing
-  function px(e){
-    const rect=draw.getBoundingClientRect();
-    return {x:(e.clientX-rect.left)*(W/rect.width), y:(e.clientY-rect.top)*(H/rect.height)};
-  }
-  draw.addEventListener('pointerdown',e=>{
-    if(state!=='playing') return;
-    const p=px(e);
-    if(!inActive(p.x,p.y)) return;
-    drawing=true; last=p;
-    draw.setPointerCapture(e.pointerId);
-    dctx.beginPath(); dctx.arc(p.x,p.y,6,0,Math.PI*2);
-    dctx.fillStyle= tool==='erase'?'rgba(0,0,0,1)':'#7cff6b';
-    if(tool==='erase'){ dctx.globalCompositeOperation='destination-out'; dctx.fill(); dctx.globalCompositeOperation='source-over'; }
-    else dctx.fill();
-  });
-  draw.addEventListener('pointermove',e=>{
-    if(!drawing) return;
-    const p=px(e);
-    if(!inActive(p.x,p.y)){ drawing=false; return; }
-    if(axisMode==='v' && p.x<axisX){ drawing=false; return; }
-    if(axisMode==='h' && p.y<axisY){ drawing=false; return; }
-    dctx.lineWidth= tool==='erase'?22:14;
-    dctx.lineCap='round'; dctx.lineJoin='round';
-    if(tool==='erase'){ dctx.globalCompositeOperation='destination-out'; dctx.strokeStyle='rgba(0,0,0,1)'; }
-    else { dctx.globalCompositeOperation='source-over'; dctx.strokeStyle='#7cff6b'; }
-    dctx.beginPath(); dctx.moveTo(last.x,last.y); dctx.lineTo(p.x,p.y); dctx.stroke();
-    last=p;
-  });
-  draw.addEventListener('pointerup',()=>{ drawing=false; last=null; });
-  draw.addEventListener('pointercancel',()=>{ drawing=false; last=null; });
-
-  // timer
-  function startTimer(sec){
-    timeLeft=sec; updateTimer();
-    if(timerHandle) clearInterval(timerHandle);
-    timerHandle=setInterval(()=>{
-      timeLeft-=0.1;
-      if(timeLeft<=0){ timeLeft=0; updateTimer(); clearInterval(timerHandle); evaluate(); }
-      else updateTimer();
-    },100);
-  }
-  function updateTimer(){ document.getElementById('timer').textContent=timeLeft>0? timeLeft.toFixed(1)+'s':'0.0s'; }
-
-  // maze render
-  function renderMaze(){
-    const maze=document.getElementById('maze');
-    maze.innerHTML='';
-    for(let r=0;r<5;r++){
-      for(let c=0;c<5;c++){
-        const cell=document.createElement('div');
-        const key=r+','+c;
-        cell.className='cell';
-        if(WALLS.has(key)) cell.classList.add('wall');
-        else cell.classList.add('path');
-        const idx=PATH.findIndex(p=>p[0]===r && p[1]===c);
-        if(idx>=0 && idx<roomIndex) cell.classList.add('done');
-        if(idx===roomIndex) cell.classList.add('current');
-        if(r===4 && c===4) cell.classList.add('exit');
-        if (cell.classList.contains('done')) cell.textContent='✓';
-        else if (cell.classList.contains('current')) cell.textContent='🧍';
-        else if (r===4 && c===4) cell.textContent='🚪';
-        else if (cell.classList.contains('wall')) cell.textContent='🧱';
-        maze.appendChild(cell);
-      }
-    }
-  }
-
-  function updateHUD(){
-    document.getElementById('room').textContent=roomIndex+1;
-    document.getElementById('score').textContent=score;
-    document.getElementById('lives').textContent='❤'.repeat(Math.max(0,lives));
-    document.getElementById('combo').textContent=combo;
-    document.getElementById('progress').textContent=Math.round((roomIndex)/ (PATH.length-1)*100)+'%';
-    document.getElementById('roomName').textContent=currentShape? `${currentShape.name}（${currentShape.level}）`:'準備中';
-  }
-
-  function setMonster(m,cls){
-    const el=document.getElementById('monster');
-    el.textContent=m;
-    el.classList.remove('happy','angry');
-    void el.offsetWidth;
-    if(cls) el.classList.add(cls);
-  }
-  function confettiBurst(){
-    const c=document.getElementById('confetti');
-    c.innerHTML='';
-    const emojis=['✨','⚡','ζ','🎉','🌟','🔥'];
-    for(let i=0;i<40;i++){
-      const s=document.createElement('span');
-      s.textContent=emojis[Math.floor(Math.random()*emojis.length)];
-      s.style.left=Math.random()*100+'vw';
-      s.style.setProperty('--d',(1.2+Math.random()*1.5)+'s');
-      s.style.fontSize=(14+Math.random()*16)+'px';
-      c.appendChild(s);
-    }
-    setTimeout(()=>c.innerHTML='',2800);
-  }
-  function showModal(title,msg,btn='繼續'){
-    document.getElementById('modalTitle').textContent=title;
-    document.getElementById('modalMsg').innerHTML=msg.replace(/\n/g,'<br>');
-    document.getElementById('modalBtn').textContent=btn;
-    document.getElementById('overlay').classList.add('show');
-  }
-  document.getElementById('modalBtn').onclick=()=>{
-    document.getElementById('overlay').classList.remove('show');
-    if(state==='idle') startLevel();
-  };
-
-  function startLevel(){
-    if(roomIndex>=PATH.length-1){
-      showModal('逃出成功！',`你完成所有房間解碼！\n總分：${score}\n連擊最高：${combo}`,'再玩一次');
-      resetGame();
-      return;
-    }
-    level=roomIndex+1;
-    currentShape=SHAPES[roomIndex % SHAPES.length];
-    axisMode = roomIndex>=3 ? (roomIndex%2===0?'v':'h') : 'v';
-    buildGuide();
-    buildExpected();
-    clearDraw();
-    state='playing';
-    document.getElementById('startBtn').disabled=true;
-    document.getElementById('submitBtn').disabled=false;
-    document.getElementById('hint').textContent='畫出鏡像解開房門！';
-    setMonster(monList[roomIndex%monList.length],'');
-    const t=currentShape.level==='進階'? 10 : 12;
-    startTimer(t);
-    renderMaze();
-    updateHUD();
-  }
-
-  function evaluate(){
-    state='evaluating';
-    document.getElementById('submitBtn').disabled=true;
-    const m=getMask(draw);
-    const coverage = m.expCount>0 ? m.hit/m.expCount : 0;
-    const extraRatio = m.expCount>0 ? m.extra/m.expCount : 0;
-    const scorePct=Math.round(coverage*100);
-    const ok = coverage>=0.62 && extraRatio<=0.45 && m.playerCount>20;
-    if(ok){
-      const base=120+level*25;
-      const timeBonus=Math.round(timeLeft*10);
-      const gain=base+timeBonus+combo*20;
-      score+=gain; combo++;
-      energy=Math.min(100, energy+20);
-      setMonster('✨🐉','happy'); successSnd(); confettiBurst();
-      roomIndex++;
-      updateHUD(); renderMaze();
-      setTimeout(()=>{
-        state='idle';
-        document.getElementById('startBtn').disabled=false;
-        document.getElementById('hint').textContent='房門解鎖， onward！';
-        showModal('解碼成功！',`準確率 ${scorePct}%・得分 +${gain}\n剩餘 ${timeLeft.toFixed(1)} 秒`, '下一房');
-      },450);
-    } else {
-      combo=0; lives--;
-      setMonster('😡🐉','angry'); failSnd();
-      draw.style.transition='transform .4s'; draw.style.transform='scale(0)';
-      setTimeout(()=>{ draw.style.transition=''; draw.style.transform=''; clearDraw(); },500);
-      let suggestion='看清楚鏡像再試試';
-      if(coverage<0.45) suggestion='左半邊輪廓沒有完整鏡像，先把所有頂點描到右側。';
-      else if(extraRatio>0.35) suggestion='右邊有多餘筆畫，只按提示半邊做鏡像。';
-      else if(m.playerCount<40) suggestion='圖形尚未完成，繼續描到等量大小。';
-      else suggestion='位置仍有些誤差，請以中線為準重新定位。';
-      updateHUD();
-      if(lives<=0){
-        setTimeout(()=>{ resetGame(); showModal('遊戲結束','生命用完了，重新挑戰迷宮。','重玩'); },700);
-      } else {
-        setTimeout(()=>{
-          state='idle';
-          document.getElementById('startBtn').disabled=false;
-          document.getElementById('hint').textContent='再試一次解鎖';
-          showModal('解碼失敗',`準確率 ${scorePct}%\n修正建議：${suggestion}`, '再試');
-        },700);
-      }
-    }
-  }
-
-  document.getElementById('startBtn').onclick=()=>{ audio(); if(state!=='idle') return; if(lives<=0) resetGame(); startLevel(); };
-  document.getElementById('submitBtn').onclick=()=>{ if(state==='playing'){ if(timerHandle) clearInterval(timerHandle); evaluate(); } };
-
-  function resetGame(){
-    level=1; roomIndex=0; score=0; combo=0; lives=3; energy=0; state='idle';
-    clearDraw(); gctx.clearRect(0,0,W,H);
-    document.getElementById('startBtn').disabled=false;
-    document.getElementById('submitBtn').disabled=true;
-    document.getElementById('hint').textContent='按「進入房間」開始';
-    document.getElementById('roomName').textContent='準備中';
-    setMonster('🐉','');
-    renderMaze();
-    updateHUD();
-  }
-
-  renderMaze();
-  updateHUD();
-  document.getElementById('timer').textContent='—';
-})();
-</script>
 </body>
 </html>
