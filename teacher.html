@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>教師後台 — 對稱迷宮</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--bg:#0f1630;--panel:#16224a;--ink:#eaf2ff;--muted:#a9b7dc;--accent:#7cff6b;--bad:#ff6b7d;--ok:#7fd9c5;--border:#2a3c6e;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Microsoft JhengHei","Segoe UI",sans-serif;background:radial-gradient(900px 500px at 20% -10%,#1d2d62,var(--bg));color:var(--ink);min-height:100vh}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px}
+  header{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  h1{margin:0;font-size:24px}
+  .sub{color:var(--muted);font-size:13px}
+  .panel{background:linear-gradient(180deg,#1a2750,#0d1630);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px}
+  .filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px}
+  input,select{width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:#0b1328;color:var(--ink);font-size:14px}
+  .btn{padding:9px 14px;border:none;border-radius:10px;font-weight:bold;cursor:pointer;background:linear-gradient(135deg,#7cff6b,#4cd9b0);color:#06200a}
+  .btn.secondary{background:#1f2f5a;color:var(--ink);border:1px solid var(--border)}
+  .meta{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:13px;margin:8px 0}
+  .meta b{color:var(--accent)}
+  table{width:100%;border-collapse:collapse;background:#0b1328;border-radius:12px;overflow:hidden}
+  th,td{padding:8px 10px;border-bottom:1px solid #1c2a52;font-size:13px;text-align:left;vertical-align:top}
+  th{background:#121f45;color:var(--accent);font-size:12px}
+  .wrong{background:rgba(255,107,125,.12)}
+  .ok{background:rgba(127,217,197,.08)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:bold}
+  .badge.wrong{background:#ff6b7d33;color:#ff9aa8}
+  .badge.ok{background:#7fd9c533;color:#aaf0de}
+  .note{color:var(--muted);font-size:12px;margin-top:8px;line-height:1.6}
+  .overlay{position:fixed;inset:0;background:rgba(5,8,20,.85);display:flex;align-items:center;justify-content:center;z-index:50}
+  .card{background:#111a33;border:1px solid var(--border);border-radius:16px;padding:24px;max-width:360px;width:90%}
+  .card h2{margin:0 0 8px;color:var(--accent)}
+  .card input{margin:8px 0 12px}
+  a.link{color:var(--accent);text-decoration:none}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div style="font-size:34px">🧑‍🏫</div>
+    <div>
+      <h1>教師後台 — 對稱解碼迷宮</h1>
+      <div class="sub">查閱學生答題紀錄、錯題與篩選分析</div>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="filters">
+      <div>
+        <label>班級</label>
+        <input id="fClass" placeholder="例如 501">
+      </div>
+      <div>
+        <label>姓名</label>
+        <input id="fName" placeholder="部分姓名">
+      </div>
+      <div>
+        <label>開始日期</label>
+        <input id="fFrom" type="date">
+      </div>
+      <div>
+        <label>結束日期</label>
+        <input id="fTo" type="date">
+      </div>
+      <div>
+        <label>只看錯題</label>
+        <select id="fWrong">
+          <option value="wrong">只看錯題</option>
+          <option value="all">全部</option>
+          <option value="correct">只看答對</option>
+        </select>
+      </div>
+      <div>
+        <button class="btn" id="queryBtn">查詢</button>
+      </div>
+    </div>
+    <div class="meta">
+      <div>總筆數：<b id="totalCount">0</b></div>
+      <div>錯題數：<b id="wrongCount">0</b></div>
+      <div>涵蓋率平均：<b id="avgCoverage">—</b></div>
+      <div><a class="link" href="index.html">🏠 回首頁</a></div>
+    </div>
+    <div class="note">提示：學生若未填寫班級/姓名/座號，系統會記錄為訪客。查詢結果限制 200 筆，最新在前。</div>
+  </div>
+
+  <div class="panel">
+    <table>
+      <thead>
+        <tr>
+          <th>時間</th>
+          <th>班級</th>
+          <th>姓名</th>
+          <th>座號</th>
+          <th>房間/圖形</th>
+          <th>軸</th>
+          <th>涵蓋率</th>
+          <th>多餘</th>
+          <th>結果</th>
+        </tr>
+      </thead>
+      <tbody id="resultBody">
+        <tr><td colspan="9" style="text-align:center;color:var(--muted)">請按「查詢」載入資料</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="overlay" id="gate">
+  <div class="card">
+    <h2>教師登入</h2>
+    <div class="sub" style="margin-bottom:8px">請輸入教師密碼</div>
+    <input id="pwd" type="password" placeholder="密碼">
+    <button class="btn" style="width:100%" id="loginBtn">登入</button>
+    <div class="note">預設密碼：teacher123（請在 teacher.html 中修改）</div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL='https://fxvlhyhsvwvpvamowgvv.supabase.co';
+const SUPABASE_KEY='sb_publishable_-5dFuwXE2I4aKQpn7-WDEQ_78MxuA_Z';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const TEACHER_PASSWORD='teacher123';
+
+// gate
+if (sessionStorage.getItem('teacherUnlocked') === '1') {
+  document.getElementById('gate').classList.add('hidden');
+}
+document.getElementById('loginBtn').onclick = () => {
+  const v = document.getElementById('pwd').value;
+  if (v === TEACHER_PASSWORD) {
+    sessionStorage.setItem('teacherUnlocked','1');
+    document.getElementById('gate').classList.add('hidden');
+  } else {
+    alert('密碼不正確');
+  }
+};
+
+async function query() {
+  const cls = document.getElementById('fClass').value.trim();
+  const name = document.getElementById('fName').value.trim();
+  const from = document.getElementById('fFrom').value;
+  const to = document.getElementById('fTo').value;
+  const mode = document.getElementById('fWrong').value;
+
+  try {
+    let q = supabase.from('symmetry_attempts').select('*').order('created_at', { ascending:false }).limit(200);
+    if (cls) q = q.ilike('class_name', '%'+cls+'%');
+    if (name) q = q.ilike('student_name', '%'+name+'%');
+    if (from) q = q.gte('created_at', from + 'T00:00:00+08:00');
+    if (to) q = q.lte('created_at', to + 'T23:59:59+08:00');
+    if (mode === 'wrong') q = q.eq('is_correct', false);
+    if (mode === 'correct') q = q.eq('is_correct', true);
+
+    const { data, error } = await q;
+    if (error) { alert('查詢失敗：' + error.message); return; }
+    render(data || []);
+  } catch (e) {
+    alert('查詢錯誤：' + e.message);
+  }
+}
+
+function fmtDate(s){
+  if(!s) return '-';
+  const d = new Date(s);
+  return d.toLocaleString('zh-Hant', { hour12:false });
+}
+
+function render(rows){
+  const body = document.getElementById('resultBody');
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--muted)">沒有符合的紀錄</td></tr>';
+  } else {
+    body.innerHTML = rows.map(r => {
+      const wrong = !r.is_correct;
+      return '<tr class="' + (wrong?'wrong':'ok') + '">' +
+        '<td>' + fmtDate(r.created_at) + '</td>' +
+        '<td>' + (r.class_name||'-') + '</td>' +
+        '<td>' + (r.student_name||'-') + '</td>' +
+        '<td>' + (r.seat_number||'-') + '</td>' +
+        '<td>' + (r.room_index||'-') + ' / ' + (r.shape_name||'-') + '</td>' +
+        '<td>' + (r.axis||'-') + '</td>' +
+        '<td>' + (r.coverage!=null? (Math.round(r.coverage*100)+'%') : '-') + '</td>' +
+        '<td>' + (r.extra_ratio!=null? (Math.round(r.extra_ratio*100)+'%') : '-') + '</td>' +
+        '<td><span class="badge ' + (wrong?'wrong':'ok') + '">' + (wrong?'錯題':'答對') + '</span></td>' +
+      '</tr>';
+    }).join('');
+  }
+  document.getElementById('totalCount').textContent = rows.length;
+  const wrong = rows.filter(r=>!r.is_correct).length;
+  document.getElementById('wrongCount').textContent = wrong;
+  const cov = rows.filter(r=>r.coverage!=null).map(r=>r.coverage);
+  const avg = cov.length ? Math.round(cov.reduce((a,b)=>a+b,0)/cov.length*100)+'%' : '—';
+  document.getElementById('avgCoverage').textContent = avg;
+}
+
+document.getElementById('queryBtn').onclick = query;
+// auto load wrong records initially
+query();
+</script>
+</body>
+</html>
