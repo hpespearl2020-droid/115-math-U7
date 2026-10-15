@@ -115,7 +115,7 @@
     <div class="sub" style="margin-bottom:8px">請輸入教師密碼</div>
     <input id="pwd" type="password" placeholder="密碼">
     <button class="btn" style="width:100%" id="loginBtn">登入</button>
-    <div class="note">預設密碼：teacher123（請在 teacher.html 中修改）</div>
+    <div class="note">密碼：6666</div>
   </div>
 </div>
 
@@ -124,7 +124,7 @@ const SUPABASE_URL='https://fxvlhyhsvwvpvamowgvv.supabase.co';
 const SUPABASE_KEY='sb_publishable_-5dFuwXE2I4aKQpn7-WDEQ_78MxuA_Z';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-const TEACHER_PASSWORD='teacher123';
+const TEACHER_PASSWORD='6666';
 
 // gate
 if (sessionStorage.getItem('teacherUnlocked') === '1') {
