@@ -398,6 +398,43 @@
     if(state==='idle') startLevel();
   };
 
+  function getStudentInfo(){
+    let info = null;
+    try { info = JSON.parse(localStorage.getItem('mazeStudent')||'null'); } catch(e){}
+    if (!info) {
+      const raw = prompt('請輸入 班級/姓名/座號（用 / 分隔，可留空）\n例如：501/王小明/05\n留空則為訪客','');
+      const parts = (raw||'').split('/').map(s=> (s||'').trim());
+      if (!raw || !raw.trim()) {
+        info = { class_name:'訪客', student_name:'訪客', seat_number:'—' };
+      } else {
+        info = {
+          class_name: parts[0] || '訪客',
+          student_name: parts[1] || (parts[0] ? '訪客' : '訪客'),
+          seat_number: parts[2] || '—'
+        };
+      }
+      localStorage.setItem('mazeStudent', JSON.stringify(info));
+    }
+    return info;
+  }
+  async function recordAttempt(isCorrect, metrics){
+    if(!supabaseClient) return;
+    const st = getStudentInfo();
+    try {
+      await supabaseClient.from('symmetry_attempts').insert({
+        game:'symmetry_maze',
+        class_name: st.class_name,
+        student_name: st.student_name,
+        seat_number: st.seat_number,
+        room_index: roomIndex+1,
+        shape_name: currentShape? currentShape.name : null,
+        axis: axisMode,
+        coverage: metrics.coverage,
+        extra_ratio: metrics.extraRatio,
+        is_correct: isCorrect
+      });
+    } catch(e){ console.warn('recordAttempt', e); }
+  }
   async function loadLeaderboard(elID){
     if(!supabaseClient) return;
     try {
@@ -423,15 +460,16 @@
   }
   async function saveScore(score){
     if(!supabaseClient) return null;
-    const player_name = getPlayerName();
     try {
-      await supabaseClient.from('game_scores').insert({ game:'symmetry_maze', player_name, score, level: PATH.length-1 });
+      const st = getStudentInfo();
+      await supabaseClient.from('game_scores').insert({ game:'symmetry_maze', player_name: st.student_name, score, level: PATH.length-1, class_name: st.class_name, student_name: st.student_name, seat_number: st.seat_number });
       const { data } = await supabaseClient.from('game_scores').select('player_name,score').order('score', {ascending:false}).limit(5);
       return data;
     } catch(e){ console.warn('saveScore', e); return null; }
   }
 
   function startLevel(){
+    if (roomIndex === 0) getStudentInfo();
     if(roomIndex>=PATH.length-1){
       showModal('逃出成功！',`你完成所有房間解碼！\n總分：${score}\n連擊最高：${combo}`,'再玩一次');
       resetGame();
@@ -462,6 +500,8 @@
     const extraRatio = m.expCount>0 ? m.extra/m.expCount : 0;
     const scorePct=Math.round(coverage*100);
     const ok = coverage>=0.62 && extraRatio<=0.45 && m.playerCount>20;
+    // 紀錄答題（含錯題）
+    recordAttempt(ok, { coverage, extraRatio });
     if(ok){
       const base=120+level*25;
       const timeBonus=Math.round(timeLeft*10);
